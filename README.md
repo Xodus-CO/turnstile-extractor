@@ -17,7 +17,7 @@ If you ever need to solve it manually (2captcha, capmonster, etc.) or build your
 ### How to run
 
 ```bash
-pip install playwright playwright-stealth
+pip3 install playwright playwright-stealth
 playwright install chromium
 
 python3 main.py https://example-protected-site.com

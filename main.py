@@ -24,6 +24,8 @@ async def main():
         browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(viewport={"width": 1440, "height": 900})
         page = await context.new_page()
+        # Note: Using Stealth class with apply_stealth_async() method for newer playwright-stealth versions
+        # Older versions used stealth_async() function directly
         stealth = Stealth()
         await stealth.apply_stealth_async(page)
 
@@ -105,30 +107,31 @@ async def main():
         if turnstile_exists and 'widget_data' in locals() and widget_data.get('sitekey'):
             data.update(widget_data)
 
-        # Use site key from network request if found
-        if site_key_from_network:
+        # Use site key from network request if found (prioritize network extraction as most reliable)
+        if site_key_from_network and not data.get('sitekey'):
             data['sitekey'] = site_key_from_network
             print(f"Using site key from network request: {data['sitekey']}")
 
         # If still no site key, try to extract from page source
         if not data.get('sitekey'):
-            page_source = await page.content()
-            # Look for Turnstile site key (0x...)
-            sitekey_match = re.search(r'sitekey["\']?\s*[:=]\s*["\'](0x[A-Za-z0-9_-]{15,})["\']', page_source, re.IGNORECASE)
-            if sitekey_match:
-                data['sitekey'] = sitekey_match.group(1)
-                print(f"Found site key in page source: {data['sitekey'][:30]}...")
-
-            # Also check for data-sitekey attribute
+            # First check for data-sitekey attribute (cheaper than fetching full page content)
             data_sitekey = await page.evaluate("""
                 () => {
                     var elem = document.querySelector('[data-sitekey]');
                     return elem ? elem.getAttribute('data-sitekey') : null;
                 }
             """)
-            if data_sitekey and data_sitekey.startswith('0x'):
+            if data_sitekey and re.match(r'^0x[A-Za-z0-9_-]{20,}$', data_sitekey):
                 data['sitekey'] = data_sitekey
                 print(f"Found site key in data-sitekey: {data['sitekey'][:30]}...")
+            else:
+                # Only fetch page source if attribute check failed
+                page_source = await page.content()
+                # Look for Turnstile site key (0x...) - standardized to {20,} for consistency
+                sitekey_match = re.search(r'sitekey["\']?\s*[:=]\s*["\'](0x[A-Za-z0-9_-]{20,})["\']', page_source, re.IGNORECASE)
+                if sitekey_match:
+                    data['sitekey'] = sitekey_match.group(1)
+                    print(f"Found site key in page source: {data['sitekey'][:30]}...")
         cookies = await context.cookies()
         cf_cookies = {c["name"]: c["value"] for c in cookies
                      if any(x in c["name"] for x in ["cf", "__cf", "clearance"])}

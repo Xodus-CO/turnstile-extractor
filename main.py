@@ -75,6 +75,7 @@ async def main():
         turnstile_exists = await page.evaluate("() => typeof turnstile !== 'undefined'")
         print(f"Turnstile object exists: {turnstile_exists}")
 
+        widget_data = {}
         if turnstile_exists:
             widget_count = await page.evaluate("() => turnstile._widgets ? turnstile._widgets.length : 0")
             print(f"Widget count: {widget_count}")
@@ -104,7 +105,7 @@ async def main():
         data = await page.evaluate("() => window.cf || {}")
 
         # Merge widget data if found
-        if turnstile_exists and 'widget_data' in locals() and widget_data.get('sitekey'):
+        if widget_data.get('sitekey'):
             data.update(widget_data)
 
         # Use site key from network request if found (prioritize network extraction as most reliable)

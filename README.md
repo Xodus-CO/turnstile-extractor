@@ -1,13 +1,20 @@
 # Cloudflare Turnstile Extractor
 
-Simple Python script that opens a page protected by Cloudflare Turnstile, waits for the widget to initialize, hooks turnstile.render and grabs everything you normally can't see from a normal request:
+Simple Python script that opens a page protected by Cloudflare Turnstile, waits for the widget to initialize, and extracts everything you normally can't see from a normal request:
 
 - sitekey  
 - cData  
 - action  
 - chlPageData   
 
-Everything gets dumped into cf_extracted.json in the current folder
+The script uses multiple extraction strategies with automatic fallbacks:
+1. **Primary method**: Hooks `turnstile.render()` to capture parameters during widget initialization
+2. **Widget state extraction**: Reads from `turnstile._widgets` and `turnstile._config` if available
+3. **Network monitoring**: Captures site key from Turnstile API requests
+4. **DOM attribute extraction**: Reads `data-sitekey` attribute from page elements
+5. **Page source parsing**: Searches HTML source for site key patterns
+
+Everything gets dumped into `cf_extracted.json` in the current folder
 
 ### Why this exists
 
@@ -22,18 +29,27 @@ playwright install chromium
 
 python3 main.py https://example-protected-site.com
 ```
-##Output
-Creates cf_extracted.json with the extracted turnstile parameters
-
-ex:
+## Output
+Creates `cf_extracted.json` with the extracted turnstile parameters. The script provides debug output showing which extraction method succeeded:
 
 ```bash
-started on target → https://target.etc
+Hook triggered: true
+Turnstile object exists: true
+Widget count: 1
+Widget data: {'sitekey': '0x...', 'cData': '...', ...}
+all extracted → cf_extracted.json
+```
 
-sitekey      → xxxxxxx
-cData        → xxxxxxx
-action       → interactive
-chlPageData  → xxxxxxxx-1763818211-1.3.1.1-gIKH.pU7vpxRLWj8.JmIgNZuQk3...
+The output file contains:
+```json
+{
+  "url": "https://example-protected-site.com",
+  "sitekey": "0x...",
+  "cData": "...",
+  "action": "interactive",
+  "chlPageData": "...",
+  "cookies": {...}
+}
 ```
 
 ## ⚠️ Disclaimer
